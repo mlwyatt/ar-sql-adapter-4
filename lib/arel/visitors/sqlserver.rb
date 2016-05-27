@@ -90,7 +90,7 @@ module Arel
 
       # SQLServer ToSql/Visitor (Overides)
 
-      def visit_Arel_Nodes_SelectStatement(o)
+      def visit_Arel_Nodes_SelectStatement(o,windowed = nil)
         if complex_count_sql?(o)
           visit_Arel_Nodes_SelectStatementForComplexCount(o)
         elsif o.offset
@@ -133,7 +133,7 @@ module Arel
 
       # SQLServer ToSql/Visitor (Additions)
 
-      def visit_Arel_Nodes_SelectStatementWithOutOffset(o)
+      def visit_Arel_Nodes_SelectStatementWithOutOffset(o,windowed = false)
         find_and_fix_uncorrelated_joins_in_select_statement(o)
         core = o.cores.first
         projections = core.projections
@@ -174,7 +174,7 @@ module Arel
           (rowtable_projections(o).map{ |x| visit(x) }.join(', ')),
           "FROM (",
             "SELECT #{core.set_quantifier ? 'DISTINCT DENSE_RANK()' : 'ROW_NUMBER()'} OVER (ORDER BY #{orders.map{ |x| visit(x) }.join(', ')}) AS [__rn],",
-            visit_Arel_Nodes_SelectStatementWithOutOffset(o),
+            visit_Arel_Nodes_SelectStatementWithOutOffset(o,true),
           ") AS [__rnt]",
           (visit(o.offset) if o.offset),
           "ORDER BY [__rnt].[__rn] ASC"
