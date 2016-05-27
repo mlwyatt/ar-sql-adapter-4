@@ -154,14 +154,14 @@ module Arel
           projections = projections.map { |x| projection_without_expression(x) }
         end
         [ ("SELECT" if !windowed),
-          (visit(core.set_quantifier) if core.set_quantifier && !windowed),
+          (visit(core.set_quantifier,[]) if core.set_quantifier && !windowed),
           (visit(o.limit,[]) if o.limit && !windowed),
-          (projections.map{ |x| v = visit(x); v == "1" ? "1 AS [__wrp]" : v }.join(', ')),
+          (projections.map{ |x| v = visit(x,[]); v == "1" ? "1 AS [__wrp]" : v }.join(', ')),
           (source_with_lock_for_select_statement(o)),
-          ("WHERE #{core.wheres.map{ |x| visit(x) }.join ' AND ' }" unless core.wheres.empty?),
-          ("GROUP BY #{groups.map { |x| visit x }.join ', ' }" unless groups.empty?),
-          (visit(core.having) if core.having),
-          ("ORDER BY #{orders.map{ |x| visit(x) }.join(', ')}" if !orders.empty? && !windowed)
+          ("WHERE #{core.wheres.map{ |x| visit(x,[]) }.join ' AND ' }" unless core.wheres.empty?),
+          ("GROUP BY #{groups.map { |x| visit(x,[]) }.join ', ' }" unless groups.empty?),
+          (visit(core.having,[]) if core.having),
+          ("ORDER BY #{orders.map{ |x| visit(x,[]) }.join(', ')}" if !orders.empty? && !windowed)
         ].compact.join ' '
       end
 
@@ -170,13 +170,13 @@ module Arel
         o.limit ||= Arel::Nodes::Limit.new(9223372036854775807)
         orders = rowtable_orders(o)
         [ "SELECT",
-          (visit(o.limit) if o.limit && !windowed_single_distinct_select_statement?(o)),
+          (visit(o.limit,[]) if o.limit && !windowed_single_distinct_select_statement?(o)),
           (rowtable_projections(o).map{ |x| visit(x) }.join(', ')),
           "FROM (",
             "SELECT #{core.set_quantifier ? 'DISTINCT DENSE_RANK()' : 'ROW_NUMBER()'} OVER (ORDER BY #{orders.map{ |x| visit(x) }.join(', ')}) AS [__rn],",
             visit_Arel_Nodes_SelectStatementWithOutOffset(o,true),
           ") AS [__rnt]",
-          (visit(o.offset) if o.offset),
+          (visit(o.offset,[]) if o.offset),
           "ORDER BY [__rnt].[__rn] ASC"
         ].compact.join ' '
       end
@@ -188,16 +188,16 @@ module Arel
         [ "SELECT COUNT([count]) AS [count_id]",
           "FROM (",
             "SELECT",
-            (visit(o.limit) if o.limit),
+            (visit(o.limit,[]) if o.limit),
             "ROW_NUMBER() OVER (ORDER BY #{orders.map{ |x| visit(x) }.join(', ')}) AS [__rn],",
             "1 AS [count]",
             (source_with_lock_for_select_statement(o)),
-            ("WHERE #{core.wheres.map{ |x| visit(x) }.join ' AND ' }" unless core.wheres.empty?),
-            ("GROUP BY #{core.groups.map { |x| visit x }.join ', ' }" unless core.groups.empty?),
-            (visit(core.having) if core.having),
-            ("ORDER BY #{o.orders.map{ |x| visit(x) }.join(', ')}" if !o.orders.empty?),
+            ("WHERE #{core.wheres.map{ |x| visit(x,[]) }.join ' AND ' }" unless core.wheres.empty?),
+            ("GROUP BY #{core.groups.map { |x| visit(x,[]) }.join ', ' }" unless core.groups.empty?),
+            (visit(core.having,[]) if core.having),
+            ("ORDER BY #{o.orders.map{ |x| visit(x,[]) }.join(', ')}" if !o.orders.empty?),
           ") AS [__rnt]",
-          (visit(o.offset) if o.offset)
+          (visit(o.offset,[]) if o.offset)
         ].compact.join ' '
       end
 
@@ -206,9 +206,9 @@ module Arel
 
       def source_with_lock_for_select_statement(o)
         core = o.cores.first
-        source = "FROM #{visit(core.source).strip}" if core.source
+        source = "FROM #{visit(core.source,[]).strip}" if core.source
         if source && o.lock
-          lock = visit o.lock
+          lock = visit(o.lock,[])
           index = source.match(/FROM [\w\[\]\.]+/)[0].mb_chars.length
           source.insert index, " #{lock}"
         else
@@ -252,7 +252,7 @@ module Arel
       end
       
       def single_distinct_select_everything_statement?(o)
-        single_distinct_select_statement?(o) && visit(o.cores.first.projections.first).ends_with?(".*")
+        single_distinct_select_statement?(o) && visit(o.cores.first.projections.first,[]).ends_with?(".*")
       end
       
       def top_one_everything_for_through_join?(o)
@@ -334,7 +334,7 @@ module Arel
           core.projections.map do |x|
             x.dup.tap do |p|
               p.sub! 'DISTINCT', ''
-              p.insert 0, visit(o.limit) if o.limit
+              p.insert 0, visit(o.limit,[]) if o.limit
               p.gsub! /\[?#{tn}\]?\./, '[__rnt].'
               p.strip!
             end
@@ -343,7 +343,7 @@ module Arel
           tn = table_from_select_statement(o).name
           core.projections.map do |x|
             x.dup.tap do |p|
-              p.sub! 'DISTINCT', "DISTINCT #{visit(o.limit)}".strip if o.limit
+              p.sub! 'DISTINCT', "DISTINCT #{visit(o.limit,[])}".strip if o.limit
               p.gsub! /\[?#{tn}\]?\./, '[__rnt].'
               p.strip!
             end
@@ -372,7 +372,7 @@ module Arel
 
       # TODO: We use this for grouping too, maybe make Grouping objects vs SqlLiteral.
       def projection_without_expression(projection)
-        Arel.sql(visit(projection).split(',').map do |x|
+        Arel.sql(visit(projection,[]).split(',').map do |x|
           x.strip!
           x.sub!(/^(COUNT|SUM|MAX|MIN|AVG)\s*(\((.*)\))?/,'\3')
           x.sub!(/^DISTINCT\s*/,'')
