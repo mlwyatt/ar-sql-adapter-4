@@ -155,7 +155,7 @@ module Arel
         end
         [ ("SELECT" if !windowed),
           (visit(core.set_quantifier) if core.set_quantifier && !windowed),
-          (visit(o.limit) if o.limit && !windowed),
+          (visit(o.limit,nil) if o.limit && !windowed),
           (projections.map{ |x| v = visit(x); v == "1" ? "1 AS [__wrp]" : v }.join(', ')),
           (source_with_lock_for_select_statement(o)),
           ("WHERE #{core.wheres.map{ |x| visit(x) }.join ' AND ' }" unless core.wheres.empty?),
