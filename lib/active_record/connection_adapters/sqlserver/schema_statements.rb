@@ -161,7 +161,7 @@ module ActiveRecord
             :varchar_max  => { :name => 'varchar(max)' },
             :nchar        => { :name => "nchar" },
             :nvarchar     => { :name => "nvarchar", :limit => 255 },
-            :nvarchar_max => { :name => "nvarchar(max)" },
+            :nvarchar_max => { :name => "nvarchar(255)" },
             :ntext        => { :name => "ntext" },
             :ss_timestamp => { :name => 'timestamp' }
           }
