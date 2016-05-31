@@ -168,7 +168,7 @@ module ActiveRecord
         end
 
         def column_definitions(table_name)
-          db_name = Utils.unqualify_db_name(table_name || 'dbo')
+          db_name = Utils.unqualify_db_name(table_name)
           db_name_with_period = "#{db_name}." if db_name
           table_schema = Utils.unqualify_table_schema(table_name)
           table_name = Utils.unqualify_table_name(table_name)
